@@ -1,0 +1,85 @@
+{
+  "summary": "示例数据：把酒店矩阵、单晚价格、小红书口碑和方案组合放到一个可分享 HTML。",
+  "hotels": [
+    {
+      "nameZh": "岘港佩尼苏拉酒店",
+      "nameEn": "Peninsula Hotel Danang",
+      "region": "美溪北段",
+      "locationSummary": "靠山茶，海边线，适合全程或后半程",
+      "tripUrl": "https://www.trip.com/hotels/list?cityName=Da%20Nang&searchWord=Peninsula%20Hotel%20Danang",
+      "nightlyPrices": {
+        "5/2": 559,
+        "5/3": 534,
+        "5/4": 576,
+        "5/5": 564,
+        "5/6": 576
+      },
+      "lateStayAvg": 572,
+      "useCases": ["后段主住", "最平衡", "可1+4"],
+      "xiaohongshu": {
+        "strength": "中",
+        "pros": ["价格前后段都比较稳", "海景线里整体不容易后悔"],
+        "cons": ["单体爆点不如更贵的resort", "长测评比萨拉少"],
+        "noteLinks": [
+          {
+            "label": "小红书搜索",
+            "url": "https://www.xiaohongshu.com/search_result?keyword=%E5%B2%98%E6%B8%AF%20%E4%BD%A9%E5%B0%BC%E8%8B%8F%E6%8B%89%E9%85%92%E5%BA%97"
+          }
+        ]
+      }
+    },
+    {
+      "nameZh": "岘港萨拉海滩酒店",
+      "nameEn": "Sala Danang Beach Hotel",
+      "region": "美溪北段",
+      "locationSummary": "海边生活圈强，适合后半程",
+      "tripUrl": "https://www.trip.com/hotels/list?cityName=Da%20Nang&searchWord=Sala%20Danang%20Beach%20Hotel",
+      "nightlyPrices": {
+        "5/2": 589,
+        "5/3": 782,
+        "5/4": 375,
+        "5/5": 459,
+        "5/6": 375
+      },
+      "lateStayAvg": 403,
+      "useCases": ["后段主住", "2+3强候选"],
+      "xiaohongshu": {
+        "strength": "强",
+        "pros": ["早餐和位置常被夸", "海边+周边吃饭方便", "后段价格回落后很能打"],
+        "cons": ["5/3单晚可能跳涨", "城市海景酒店不是纯resort"],
+        "noteLinks": [
+          {
+            "label": "小红书搜索",
+            "url": "https://www.xiaohongshu.com/search_result?keyword=%E5%B2%98%E6%B8%AF%20Sala%20Hotel"
+          }
+        ]
+      }
+    }
+  ],
+  "combos": [
+    {
+      "name": "最稳",
+      "type": "2+3",
+      "reason": "前段便宜过渡，后段切进更值的海边主住酒店，整体最不容易后悔。",
+      "nightlyBreakdown": [
+        { "night": "5/2", "hotelZh": "巴黎德利海滩酒店", "price": 384 },
+        { "night": "5/3", "hotelZh": "巴黎德利海滩酒店", "price": 352 },
+        { "night": "5/4", "hotelZh": "岘港萨拉海滩酒店", "price": 375 },
+        { "night": "5/5", "hotelZh": "岘港萨拉海滩酒店", "price": 459 },
+        { "night": "5/6", "hotelZh": "岘港萨拉海滩酒店", "price": 375 }
+      ]
+    },
+    {
+      "name": "最省脑子",
+      "type": "1+4",
+      "reason": "只换一次酒店，第一晚晚到凑合住，后面四晚住稳牌。",
+      "nightlyBreakdown": [
+        { "night": "5/2", "hotelZh": "巴黎德利海滩酒店", "price": 384 },
+        { "night": "5/3", "hotelZh": "岘港佩尼苏拉酒店", "price": 534 },
+        { "night": "5/4", "hotelZh": "岘港佩尼苏拉酒店", "price": 576 },
+        { "night": "5/5", "hotelZh": "岘港佩尼苏拉酒店", "price": 564 },
+        { "night": "5/6", "hotelZh": "岘港佩尼苏拉酒店", "price": 576 }
+      ]
+    }
+  ]
+}

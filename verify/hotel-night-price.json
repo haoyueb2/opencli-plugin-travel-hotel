@@ -1,0 +1,75 @@
+{
+  "args": [
+    "Peninsula Hotel Danang",
+    "--city",
+    "Da Nang",
+    "--check-in",
+    "2026-05-03",
+    "--check-out",
+    "2026-05-04"
+  ],
+  "expect": {
+    "rowCount": { "min": 1, "max": 1 },
+    "columns": [
+      "hotel",
+      "matchedHotel",
+      "city",
+      "checkIn",
+      "checkOut",
+      "roomType",
+      "price",
+      "originalPrice",
+      "totalPrice",
+      "currency",
+      "breakfast",
+      "freeCancel",
+      "payLater",
+      "availability",
+      "note",
+      "detailUrl"
+    ],
+    "types": {
+      "hotel": "string",
+      "matchedHotel": "string",
+      "city": "string",
+      "checkIn": "string",
+      "checkOut": "string",
+      "roomType": "string",
+      "price": "string",
+      "originalPrice": "string",
+      "totalPrice": "string",
+      "currency": "string",
+      "breakfast": "string",
+      "freeCancel": "string",
+      "payLater": "string",
+      "availability": "string",
+      "note": "string",
+      "detailUrl": "string"
+    },
+    "patterns": {
+      "checkIn": "^2026-05-03$",
+      "checkOut": "^2026-05-04$",
+      "currency": "^CNY$",
+      "price": "^CNY\\s*[0-9,]+$|^[0-9,]+$",
+      "totalPrice": "^[0-9,]+$",
+      "availability": "^(available|sold_out)$",
+      "breakfast": "^(yes|no)$",
+      "freeCancel": "^(yes|no)$",
+      "payLater": "^(yes|no)$",
+      "detailUrl": "^https://www\\.trip\\.com/hotels/detail/"
+    },
+    "notEmpty": [
+      "hotel",
+      "matchedHotel",
+      "roomType",
+      "price",
+      "totalPrice",
+      "detailUrl"
+    ],
+    "mustBeTruthy": [
+      "price",
+      "totalPrice",
+      "detailUrl"
+    ]
+  }
+}

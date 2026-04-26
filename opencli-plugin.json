@@ -1,0 +1,6 @@
+{
+  "name": "travel-hotel",
+  "version": "0.1.0",
+  "opencli": ">=1.7.0",
+  "description": "Trip single-night hotel pricing adapter plus a reusable travel hotel matrix skill."
+}

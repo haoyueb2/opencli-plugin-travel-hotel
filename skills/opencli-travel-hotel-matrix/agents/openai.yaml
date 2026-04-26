@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenCLI Travel Hotel Matrix"
+  short_description: "用 OpenCLI 搜小红书与酒店价格并生成酒店价格矩阵 HTML。"
+  default_prompt: "Use OpenCLI to gather Xiaohongshu hotel notes, collect hotel candidate names and prices, build a nightly price matrix, generate a shareable HTML, and compare stay combinations with reasons."
