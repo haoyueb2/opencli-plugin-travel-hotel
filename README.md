@@ -64,6 +64,7 @@ It takes a JSON input and renders a hotel comparison page with:
 
 - nightly price columns
 - Xiaohongshu pros/cons
+- Trip, Ctrip, and Xiaohongshu source links
 - filter chips
 - combo cards with total price and average nightly cost
 
@@ -160,12 +161,16 @@ The skill entrypoint is:
 The skill assumes this workflow:
 
 1. ask or confirm trip dates, budget ceiling, and whether hotel switching is acceptable
-2. `opencli xiaohongshu search` and `opencli xiaohongshu note` for hotel pool and pros/cons
-3. `opencli ctrip search` for name normalization when needed
-4. `opencli trip hotel-night-price` for nightly pricing
-5. build a nightly matrix first
-6. let the matrix reveal whether the best answer is `0 switch`, `1 switch`, or `2 switches`
-7. HTML output and final recommendation
+2. ask or infer the travel intent, such as resort stay, city sightseeing, business, family, food/nightlife, transit, or side trips
+3. create a working JSON file for hotel candidates, prices, and source links
+4. `opencli xiaohongshu search` and `opencli xiaohongshu note` for hotel pool and pros/cons
+5. `opencli ctrip search` for name normalization and Ctrip links when available
+6. `opencli trip hotel-night-price` for nightly pricing and Trip detail links
+7. build a nightly matrix first
+8. let the matrix reveal whether the best answer is `0 switch`, `1 switch`, or `2 switches`
+9. HTML output and final recommendation
+
+The important design rule is that links are captured during research and stored in the JSON input. The HTML generator reads fields such as `tripUrl`, `ctripUrl`, `xiaohongshu.searchUrl`, `xiaohongshu.noteLinks[]`, and `sourceLinks[]`; it does not search the web or invent links at render time.
 
 ## Generate HTML
 
@@ -181,6 +186,10 @@ node skills/opencli-travel-hotel-matrix/scripts/generate_hotel_matrix_html.mjs \
 The sample input file is:
 
 - `skills/opencli-travel-hotel-matrix/assets/sample-hotel-matrix.json`
+
+The data schema is documented in:
+
+- `skills/opencli-travel-hotel-matrix/references/data-schema.md`
 
 ## Examples
 
@@ -267,6 +276,7 @@ opencli-plugin-travel-hotel/
 - The skill can stay nested under `skills/`.
 - The adapter currently uses Trip's keyword search HTTP endpoint to resolve the hotel, then opens the final results page and extracts the visible single-night offer.
 - The intended planning philosophy is not to hardcode `1+4`, `2+3`, or `1+1+3`; those are only common outputs after the nightly matrix is built.
+- The skill is city-agnostic. Beach and resort hotels are examples, not defaults; the hotel pool should follow the user's travel intent.
 
 ## Limitations
 

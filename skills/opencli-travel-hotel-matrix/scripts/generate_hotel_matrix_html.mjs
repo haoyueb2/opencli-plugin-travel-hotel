@@ -77,13 +77,40 @@ function renderFilterChips(items, attr) {
     .join('');
 }
 
+function buildHotelLinks(hotel) {
+  const links = [];
+  const push = (label, url) => {
+    if (url) links.push({ label, url });
+  };
+
+  push('Trip', hotel.tripUrl);
+  push('Ctrip', hotel.ctripUrl);
+  push('小红书搜索', hotel.xiaohongshu?.searchUrl);
+
+  for (const item of hotel.xiaohongshu?.noteLinks || []) {
+    push(item.label || '小红书笔记', item.url);
+  }
+
+  for (const item of hotel.sourceLinks || []) {
+    push(item.label || item.source || 'Source', item.url);
+  }
+
+  const seen = new Set();
+  return links.filter((item) => {
+    const key = `${item.label}|${item.url}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function renderHotelRow(hotel, nightColumns) {
   const nightly = hotel.nightlyPrices || {};
   const tags = (hotel.useCases || []).join('|');
   const xhs = hotel.xiaohongshu || {};
   const pros = Array.isArray(xhs.pros) ? xhs.pros : [];
   const cons = Array.isArray(xhs.cons) ? xhs.cons : [];
-  const noteLinks = Array.isArray(xhs.noteLinks) ? xhs.noteLinks : [];
+  const links = buildHotelLinks(hotel);
 
   return `
     <tr
@@ -94,7 +121,7 @@ function renderHotelRow(hotel, nightColumns) {
       <td class="sticky hotel-cell">
         <div class="hotel-name">${escapeHtml(hotel.nameZh || '')}</div>
         <div class="hotel-sub">${escapeHtml(hotel.nameEn || '')}</div>
-        ${hotel.tripUrl ? `<div class="hotel-link"><a href="${escapeHtml(hotel.tripUrl)}" target="_blank" rel="noreferrer">Trip</a></div>` : ''}
+        ${links.length ? `<div class="hotel-link">${links.slice(0, 3).map((item) => `<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.label)}</a>`).join(' · ')}</div>` : ''}
       </td>
       <td>${escapeHtml(hotel.region || '-')}</td>
       <td>${escapeHtml(hotel.locationSummary || '-')}</td>
@@ -104,7 +131,7 @@ function renderHotelRow(hotel, nightColumns) {
       <td>${pros.length ? `<ul>${pros.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '-'}</td>
       <td>${cons.length ? `<ul>${cons.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '-'}</td>
       <td>${hotel.useCases?.length ? `<ul>${hotel.useCases.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '-'}</td>
-      <td>${noteLinks.length ? noteLinks.map((item) => `<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.label || '小红书')}</a>`).join('<br/>') : '-'}</td>
+      <td>${links.length ? links.map((item) => `<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.label)}</a>`).join('<br/>') : '-'}</td>
     </tr>
   `;
 }
