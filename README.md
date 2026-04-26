@@ -8,6 +8,21 @@ This repository contains three pieces that work together:
 2. A reusable skill for hotel-matrix travel planning
 3. An HTML generator for turning hotel matrices into shareable reports
 
+## Prerequisite
+
+Before using this repository, install OpenCLI first.
+
+OpenCLI repository:
+
+- [https://github.com/jackwener/OpenCLI](https://github.com/jackwener/OpenCLI)
+
+Typical install and self-check flow:
+
+```bash
+npm install -g @jackwener/opencli
+opencli doctor --no-live
+```
+
 ## What You Get
 
 ### Plugin command
@@ -37,7 +52,7 @@ It is meant for agent workflows such as:
 - call `opencli trip hotel-night-price` repeatedly
 - build nightly price matrices
 - generate HTML reports
-- compare `1+4`, `2+3`, `1+1+3` stay combinations
+- let the matrix decide whether the best strategy is one hotel, one switch, or two switches
 
 ### HTML generator
 
@@ -54,17 +69,29 @@ It takes a JSON input and renders a hotel comparison page with:
 
 ## Install The Plugin
 
+Recommended: use the GitHub install path for normal use. That is the standard OpenCLI plugin lifecycle.
+
 ### From GitHub
 
 ```bash
 opencli plugin install github:haoyueb2/opencli-plugin-travel-hotel
 ```
 
+What OpenCLI does during GitHub install:
+
+1. clone this repo into `~/.opencli/plugins/travel-hotel`
+2. run `npm install` inside the plugin directory
+3. create `node_modules/@jackwener/opencli` as a symlink to the host OpenCLI package
+
+That `node_modules` folder inside the installed plugin is expected. It is how imports like `@jackwener/opencli/registry` resolve correctly at runtime.
+
 ### From a local checkout
 
 ```bash
 opencli plugin install file:///absolute/path/to/opencli-plugin-travel-hotel
 ```
+
+Use local checkout install only for plugin development. It is not the recommended end-user path.
 
 Then restart your shell or open a new terminal, and confirm the command exists:
 
@@ -110,6 +137,12 @@ If you already use `skills.sh`, install the bundled skill with:
 npx skills add haoyueb2/opencli-plugin-travel-hotel@opencli-travel-hotel-matrix -g -y
 ```
 
+If you want a local one-command install from this repo:
+
+```bash
+./scripts/install-codex-skill.sh
+```
+
 If you prefer manual install, copy this folder into your Codex skills directory:
 
 ```bash
@@ -126,12 +159,13 @@ The skill entrypoint is:
 
 The skill assumes this workflow:
 
-1. `opencli xiaohongshu search` and `opencli xiaohongshu note` for hotel pool and pros/cons
-2. `opencli ctrip search` for name normalization when needed
-3. `opencli trip hotel-night-price` for nightly pricing
-4. matrix generation
-5. HTML output
-6. stay-combo comparison
+1. ask or confirm trip dates, budget ceiling, and whether hotel switching is acceptable
+2. `opencli xiaohongshu search` and `opencli xiaohongshu note` for hotel pool and pros/cons
+3. `opencli ctrip search` for name normalization when needed
+4. `opencli trip hotel-night-price` for nightly pricing
+5. build a nightly matrix first
+6. let the matrix reveal whether the best answer is `0 switch`, `1 switch`, or `2 switches`
+7. HTML output and final recommendation
 
 ## Generate HTML
 
@@ -182,6 +216,29 @@ Then verify the adapter:
 opencli browser verify trip/hotel-night-price
 ```
 
+## Troubleshooting
+
+### `Cannot find module '@jackwener/opencli/registry'`
+
+This usually means the OpenCLI host symlink inside the installed plugin is broken.
+
+Reinstall from GitHub:
+
+```bash
+opencli plugin uninstall travel-hotel
+opencli plugin install github:haoyueb2/opencli-plugin-travel-hotel
+```
+
+This issue is usually in the OpenCLI install/runtime linkage, not in the plugin command code itself.
+
+### Why is there a `node_modules` folder inside the installed plugin?
+
+This is expected for OpenCLI plugins installed from GitHub.
+
+- OpenCLI runs `npm install` inside the plugin directory.
+- OpenCLI links the host package into `node_modules/@jackwener/opencli`.
+- The plugin command imports from that host package at runtime.
+
 ## Repository Layout
 
 ```text
@@ -209,6 +266,7 @@ opencli-plugin-travel-hotel/
 - OpenCLI plugin discovery scans `.js` and `.ts` command files flat at the plugin root, so `hotel-night-price.js` stays in the top level.
 - The skill can stay nested under `skills/`.
 - The adapter currently uses Trip's keyword search HTTP endpoint to resolve the hotel, then opens the final results page and extracts the visible single-night offer.
+- The intended planning philosophy is not to hardcode `1+4`, `2+3`, or `1+1+3`; those are only common outputs after the nightly matrix is built.
 
 ## Limitations
 
