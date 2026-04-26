@@ -5,7 +5,7 @@ import path from 'node:path';
 
 function usage() {
   console.error(
-    'Usage: node generate_hotel_matrix_html.mjs --input hotels.json --output report.html [--title "Da Nang Hotel Matrix"]',
+    'Usage: node generate_hotel_matrix_html.mjs --input hotels.json --output report.html [--title "Hotel Matrix"]',
   );
   process.exit(1);
 }
@@ -33,14 +33,6 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-function slug(value) {
-  return String(value ?? '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80);
-}
-
 function toNumber(value) {
   if (value == null || value === '') return null;
   const cleaned = String(value).replace(/[^\d.]/g, '');
@@ -58,10 +50,15 @@ function formatMoney(value) {
 function buildNightColumns(hotels) {
   const keys = new Set();
   for (const hotel of hotels) {
-    const nightly = hotel.nightlyPrices || {};
-    for (const key of Object.keys(nightly)) keys.add(key);
+    for (const key of Object.keys(hotel.nightlyPrices || {})) keys.add(key);
   }
   return [...keys].sort();
+}
+
+function average(values) {
+  const nums = values.map(toNumber).filter((item) => item != null);
+  if (!nums.length) return null;
+  return nums.reduce((sum, item) => sum + item, 0) / nums.length;
 }
 
 function computeComboTotals(combo) {
@@ -69,6 +66,25 @@ function computeComboTotals(combo) {
   const total = nightly.reduce((sum, item) => sum + (toNumber(item.price) || 0), 0);
   const avg = nightly.length ? total / nightly.length : 0;
   return { total, avg };
+}
+
+function xhsStrengthLabel(strength) {
+  if (strength === '强') return '多篇/专门笔记';
+  if (strength === '中') return '对比帖常见';
+  if (strength === '弱') return '补充候选';
+  return '';
+}
+
+function hotelCategory(hotel) {
+  return hotel.category || hotel.hotelType || '未分类';
+}
+
+function hotelArea(hotel) {
+  return hotel.areaTag || hotel.region || '';
+}
+
+function hotelEvidence(hotel) {
+  return hotel.sourceEvidenceLabel || hotel.evidenceLabel || xhsStrengthLabel(hotel.xiaohongshu?.strength) || '未标注';
 }
 
 function renderFilterChips(items, attr) {
@@ -104,33 +120,58 @@ function buildHotelLinks(hotel) {
   });
 }
 
+function renderRegionGuide(region, hotels) {
+  const matching = hotels.filter((hotel) => hotelArea(hotel) === region.name);
+  const examples = region.exampleHotels || matching.slice(0, 3).map((hotel) => hotel.nameZh || hotel.nameEn).filter(Boolean);
+  return `
+    <article class="region-card">
+      <div class="region-head">
+        <h3>${escapeHtml(region.name || '')}</h3>
+        <span>${matching.length ? `${matching.length} 家候选` : ''}</span>
+      </div>
+      <dl>
+        ${region.hotelStyle ? `<div><dt>酒店类型</dt><dd>${escapeHtml(region.hotelStyle)}</dd></div>` : ''}
+        ${region.vibe ? `<div><dt>整体感觉</dt><dd>${escapeHtml(region.vibe)}</dd></div>` : ''}
+        ${region.bestFor ? `<div><dt>适合</dt><dd>${escapeHtml(region.bestFor)}</dd></div>` : ''}
+        ${region.watch ? `<div><dt>注意</dt><dd>${escapeHtml(region.watch)}</dd></div>` : ''}
+      </dl>
+      ${examples.length ? `<p class="examples">本表例子：${examples.map(escapeHtml).join(' / ')}</p>` : ''}
+    </article>
+  `;
+}
+
 function renderHotelRow(hotel, nightColumns) {
   const nightly = hotel.nightlyPrices || {};
-  const tags = (hotel.useCases || []).join('|');
-  const xhs = hotel.xiaohongshu || {};
-  const pros = Array.isArray(xhs.pros) ? xhs.pros : [];
-  const cons = Array.isArray(xhs.cons) ? xhs.cons : [];
+  const pros = Array.isArray(hotel.xiaohongshu?.pros) ? hotel.xiaohongshu.pros : [];
+  const cons = Array.isArray(hotel.xiaohongshu?.cons) ? hotel.xiaohongshu.cons : [];
   const links = buildHotelLinks(hotel);
+  const allNightValues = nightColumns.map((night) => nightly[night]);
+  const completeTotal = allNightValues.every((value) => toNumber(value) != null)
+    ? allNightValues.reduce((sum, value) => sum + toNumber(value), 0)
+    : null;
+  const avgPrice = hotel.lateStayAvg ?? average(allNightValues);
 
   return `
     <tr
-      data-region="${escapeHtml(hotel.region || '')}"
-      data-strength="${escapeHtml(xhs.strength || '')}"
-      data-use-cases="${escapeHtml(tags)}"
+      data-category="${escapeHtml(hotelCategory(hotel))}"
+      data-area="${escapeHtml(hotelArea(hotel))}"
+      data-evidence="${escapeHtml(hotelEvidence(hotel))}"
     >
       <td class="sticky hotel-cell">
-        <div class="hotel-name">${escapeHtml(hotel.nameZh || '')}</div>
+        <div class="hotel-name">${escapeHtml(hotel.nameZh || hotel.nameEn || '')}</div>
         <div class="hotel-sub">${escapeHtml(hotel.nameEn || '')}</div>
-        ${links.length ? `<div class="hotel-link">${links.slice(0, 3).map((item) => `<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.label)}</a>`).join(' · ')}</div>` : ''}
+        ${links.length ? `<div class="hotel-link">${links.slice(0, 4).map((item) => `<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.label)}</a>`).join(' · ')}</div>` : ''}
       </td>
-      <td>${escapeHtml(hotel.region || '-')}</td>
-      <td>${escapeHtml(hotel.locationSummary || '-')}</td>
+      <td><span class="pill">${escapeHtml(hotelCategory(hotel))}</span></td>
+      <td>${escapeHtml(hotel.region || hotelArea(hotel) || '-')}</td>
       ${nightColumns.map((night) => `<td class="price">${formatMoney(nightly[night])}</td>`).join('')}
-      <td class="price">${formatMoney(hotel.lateStayAvg)}</td>
-      <td><span class="badge badge-${escapeHtml((xhs.strength || 'unknown').toLowerCase())}">${escapeHtml(xhs.strength || '-')}</span></td>
-      <td>${pros.length ? `<ul>${pros.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '-'}</td>
-      <td>${cons.length ? `<ul>${cons.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '-'}</td>
-      <td>${hotel.useCases?.length ? `<ul>${hotel.useCases.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '-'}</td>
+      <td class="price">${formatMoney(completeTotal)}</td>
+      <td class="price">${formatMoney(avgPrice)}</td>
+      <td>${escapeHtml(hotel.priceStatus || hotel.priceReliability || '-')}</td>
+      <td>${escapeHtml(hotelEvidence(hotel))}</td>
+      <td>${escapeHtml(hotel.locationSummary || '-')}</td>
+      <td>${pros.length ? `<ul>${pros.slice(0, 3).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '-'}</td>
+      <td>${cons.length ? `<ul>${cons.slice(0, 3).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '-'}</td>
       <td>${links.length ? links.map((item) => `<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.label)}</a>`).join('<br/>') : '-'}</td>
     </tr>
   `;
@@ -162,10 +203,11 @@ function renderComboCard(combo) {
 function renderHtml(data, title) {
   const hotels = Array.isArray(data.hotels) ? data.hotels : [];
   const combos = Array.isArray(data.combos) ? data.combos : [];
+  const regionGuides = Array.isArray(data.regionGuides) ? data.regionGuides : [];
   const nightColumns = buildNightColumns(hotels);
-  const regions = [...new Set(hotels.map((item) => item.region).filter(Boolean))].sort();
-  const strengths = [...new Set(hotels.map((item) => item.xiaohongshu?.strength).filter(Boolean))];
-  const useCases = [...new Set(hotels.flatMap((item) => item.useCases || []).filter(Boolean))];
+  const categories = [...new Set(hotels.map(hotelCategory).filter(Boolean))];
+  const areas = [...new Set(hotels.map(hotelArea).filter(Boolean))];
+  const evidences = [...new Set(hotels.map(hotelEvidence).filter(Boolean))];
 
   return `<!doctype html>
 <html lang="zh-CN">
@@ -175,272 +217,161 @@ function renderHtml(data, title) {
   <title>${escapeHtml(title)}</title>
   <style>
     :root {
-      --bg: #f5f1e8;
-      --panel: rgba(255,255,255,0.82);
-      --ink: #1f1a17;
-      --muted: #6f655d;
-      --line: rgba(31,26,23,0.12);
-      --accent: #0d7a63;
-      --accent-2: #d97a37;
-      --strong: #0d7a63;
-      --mid: #c57a1f;
-      --weak: #8d5fd3;
-      --shadow: 0 18px 50px rgba(52, 39, 28, 0.12);
+      --bg: #f7f7f4;
+      --panel: #ffffff;
+      --ink: #1f2528;
+      --muted: #667176;
+      --line: #dfe3df;
+      --accent: #1f7a6b;
+      --warm: #b86135;
+      --soft: #eef4f1;
+      --warn: #f7eee7;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: "SF Pro Display", "PingFang SC", "Noto Sans SC", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", sans-serif;
       color: var(--ink);
-      background:
-        radial-gradient(circle at top left, rgba(217,122,55,0.22), transparent 28%),
-        radial-gradient(circle at top right, rgba(13,122,99,0.18), transparent 26%),
-        linear-gradient(180deg, #f7f0e5 0%, #f1ede6 100%);
+      background: var(--bg);
     }
-    .page {
-      max-width: 1440px;
-      margin: 0 auto;
-      padding: 28px 20px 60px;
-    }
-    .hero, .panel {
-      backdrop-filter: blur(14px);
+    .page { max-width: 1480px; margin: 0 auto; padding: 28px 20px 52px; }
+    .hero { padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+    .hero h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.2; letter-spacing: 0; }
+    .hero p { margin: 0; color: var(--muted); line-height: 1.7; max-width: 980px; }
+    .summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 18px 0; }
+    .metric, .filters, .region-card, .panel, .combo-card {
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 24px;
-      box-shadow: var(--shadow);
+      border-radius: 8px;
     }
-    .hero {
-      padding: 28px;
-      margin-bottom: 18px;
-    }
-    .hero h1 {
-      margin: 0 0 10px;
-      font-size: clamp(28px, 4vw, 44px);
-      line-height: 1.02;
-      letter-spacing: -0.04em;
-    }
-    .hero p {
-      margin: 0;
-      color: var(--muted);
-      max-width: 900px;
-      line-height: 1.7;
-    }
-    .layout {
-      display: grid;
-      grid-template-columns: 1.1fr 2fr;
-      gap: 18px;
-      margin-bottom: 18px;
-    }
-    .panel {
-      padding: 22px;
-    }
-    h2 {
-      margin: 0 0 14px;
-      font-size: 22px;
-      letter-spacing: -0.02em;
-    }
-    .filters {
-      display: grid;
-      gap: 14px;
-    }
-    .filter-group h3 {
-      margin: 0 0 8px;
-      font-size: 13px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--muted);
-    }
-    .chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
+    .metric { padding: 14px; }
+    .metric strong { display: block; font-size: 22px; margin-bottom: 4px; }
+    .metric span { color: var(--muted); font-size: 13px; }
+    .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin: 18px 0 8px; flex-wrap: wrap; }
+    h2 { margin: 0; font-size: 20px; letter-spacing: 0; }
+    .note { color: var(--muted); font-size: 13px; }
+    .region-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .region-card { padding: 14px; }
+    .region-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .region-head h3 { margin: 0; font-size: 15px; letter-spacing: 0; }
+    .region-head span, .examples { color: var(--muted); font-size: 12px; }
+    .region-card dl { display: grid; gap: 8px; margin: 0; }
+    .region-card dt { color: var(--muted); font-size: 12px; }
+    .region-card dd { margin: 0; font-size: 13px; line-height: 1.55; }
+    .examples { margin: 10px 0 0; color: var(--accent); line-height: 1.5; }
+    .filters { padding: 16px; margin: 18px 0 14px; }
+    .filter-row { display: grid; grid-template-columns: 110px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid #edf0ed; }
+    .filter-row:last-child { border-bottom: 0; }
+    .filter-label { color: var(--muted); font-size: 13px; padding-top: 7px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .chip {
       border: 1px solid var(--line);
-      background: rgba(255,255,255,0.9);
+      background: #fff;
       color: var(--ink);
-      border-radius: 999px;
-      padding: 8px 12px;
+      border-radius: 8px;
+      padding: 7px 10px;
       cursor: pointer;
       font: inherit;
+      font-size: 13px;
     }
-    .chip.active {
-      background: var(--ink);
-      color: white;
-      border-color: var(--ink);
-    }
-    .meta-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }
-    .meta-card {
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      padding: 16px;
-      background: rgba(255,255,255,0.76);
-    }
-    .meta-card strong {
-      display: block;
-      font-size: 24px;
-      margin-bottom: 4px;
-    }
-    .meta-card span { color: var(--muted); }
-    .toolbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 14px;
-      flex-wrap: wrap;
-    }
-    .toolbar select {
-      border-radius: 12px;
-      border: 1px solid var(--line);
-      padding: 8px 10px;
-      background: white;
-      font: inherit;
-    }
-    .combo-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 14px;
-    }
-    .combo-card {
-      border: 1px solid var(--line);
-      border-radius: 20px;
-      padding: 18px;
-      background: rgba(255,255,255,0.82);
-    }
-    .combo-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 10px;
-    }
-    .combo-card h3 {
-      margin: 0 0 6px;
-      font-size: 20px;
-    }
-    .combo-type, .combo-reason { color: var(--muted); }
-    .combo-price {
-      text-align: right;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-    .combo-list {
-      margin: 12px 0 0;
-      padding-left: 18px;
-      line-height: 1.65;
-    }
-    .table-wrap {
-      overflow: auto;
-      border-radius: 20px;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.74);
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 1320px;
-    }
-    th, td {
-      border-bottom: 1px solid var(--line);
-      vertical-align: top;
-      text-align: left;
-      padding: 14px 12px;
-      font-size: 14px;
-    }
-    th {
-      position: sticky;
-      top: 0;
-      z-index: 3;
-      background: #fbf8f2;
-      white-space: nowrap;
-    }
-    .sticky {
-      position: sticky;
-      left: 0;
-      z-index: 2;
-      background: #fbf8f2;
-    }
-    .hotel-cell {
-      min-width: 220px;
-      box-shadow: 10px 0 18px rgba(30,20,10,0.04);
-    }
+    .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .legend { background: var(--warn); border: 1px solid #edd6c6; border-radius: 8px; padding: 12px; color: #6e4d39; margin: 12px 0 0; font-size: 13px; line-height: 1.7; }
+    .panel { padding: 0; overflow: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 1320px; }
+    th, td { border-bottom: 1px solid #edf0ed; vertical-align: top; text-align: left; padding: 11px 12px; font-size: 13px; line-height: 1.45; }
+    th { position: sticky; top: 0; z-index: 3; background: #f2f5f2; white-space: nowrap; }
+    .sticky { position: sticky; left: 0; z-index: 2; background: #fff; }
+    th.sticky { z-index: 4; background: #f2f5f2; }
+    .hotel-cell { min-width: 250px; box-shadow: 10px 0 18px rgba(30,20,10,0.04); }
     .hotel-name { font-weight: 700; margin-bottom: 4px; }
     .hotel-sub, .hotel-link a { color: var(--muted); font-size: 12px; }
+    .hotel-link { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 7px; }
     td ul { margin: 0; padding-left: 18px; line-height: 1.6; }
-    td.price { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
-    .badge {
-      display: inline-block;
-      border-radius: 999px;
-      padding: 4px 10px;
-      color: white;
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .badge-强, .badge-strong { background: var(--strong); }
-    .badge-中, .badge-mid { background: var(--mid); }
-    .badge-弱, .badge-weak { background: var(--weak); }
-    .empty { color: var(--muted); }
-    @media (max-width: 980px) {
-      .layout { grid-template-columns: 1fr; }
-      .meta-grid { grid-template-columns: 1fr; }
-      .page { padding: 18px 14px 48px; }
-      .hero, .panel { border-radius: 18px; }
+    td.price { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+    .pill { display: inline-flex; border-radius: 999px; background: var(--soft); color: var(--accent); padding: 4px 8px; white-space: nowrap; }
+    a { color: #116b8f; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .combo-section { margin-top: 28px; }
+    .combo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+    .combo-card { padding: 16px; }
+    .combo-head { display: flex; justify-content: space-between; gap: 12px; }
+    .combo-card h3 { margin: 0 0 6px; font-size: 18px; letter-spacing: 0; }
+    .combo-type, .combo-reason { color: var(--muted); line-height: 1.6; }
+    .combo-price { text-align: right; font-weight: 700; white-space: nowrap; }
+    .combo-list { margin: 12px 0 0; padding-left: 18px; line-height: 1.65; }
+    .hidden { display: none; }
+    @media (max-width: 900px) {
+      .page { padding: 18px 12px 40px; }
+      .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .region-grid { grid-template-columns: 1fr; }
+      .filter-row { grid-template-columns: 1fr; gap: 6px; }
     }
   </style>
 </head>
 <body>
-  <div class="page">
+  <main class="page">
     <section class="hero">
       <h1>${escapeHtml(title)}</h1>
-      <p>${escapeHtml(data.summary || '这份页面用于把酒店池、小红书口碑、按夜价格矩阵和入住组合放到同一页里，方便快速比较与收口。')}</p>
+      <p>${escapeHtml(data.summary || '这份页面用于把酒店池、来源证据、按夜价格矩阵和入住组合放到同一页里，方便快速比较与收口。')}</p>
     </section>
 
-    <section class="layout">
-      <div class="panel">
-        <h2>筛选器</h2>
-        <div class="filters">
-          <div class="filter-group">
-            <h3>区域</h3>
-            <div class="chips">${renderFilterChips(regions, 'region')}</div>
-          </div>
-          <div class="filter-group">
-            <h3>小红书强度</h3>
-            <div class="chips">${renderFilterChips(strengths, 'strength')}</div>
-          </div>
-          <div class="filter-group">
-            <h3>用途</h3>
-            <div class="chips">${renderFilterChips(useCases, 'use-case')}</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h2>概览</h2>
-        <div class="meta-grid">
-          <div class="meta-card">
-            <strong>${hotels.length}</strong>
-            <span>酒店总数</span>
-          </div>
-          <div class="meta-card">
-            <strong>${combos.length}</strong>
-            <span>组合方案</span>
-          </div>
-          <div class="meta-card">
-            <strong>${nightColumns.length}</strong>
-            <span>单晚价格列</span>
-          </div>
-        </div>
-      </div>
+    <section class="summary">
+      <div class="metric"><strong>${hotels.length}</strong><span>酒店总数</span></div>
+      <div class="metric"><strong>${combos.length}</strong><span>组合方案</span></div>
+      <div class="metric"><strong>${nightColumns.length}</strong><span>单晚价格列</span></div>
+      <div class="metric"><strong>${areas.length}</strong><span>地理区域</span></div>
     </section>
 
-    <section class="panel" style="margin-bottom:18px;">
+    ${regionGuides.length ? `
+    <section class="region-guide">
+      <div class="toolbar">
+        <h2>区域怎么选</h2>
+        <div class="note">先按区域气质排除，再回到价格矩阵看具体酒店</div>
+      </div>
+      <div class="region-grid">
+        ${regionGuides.map((region) => renderRegionGuide(region, hotels)).join('')}
+      </div>
+    </section>` : ''}
+
+    <section class="filters">
+      <div class="filter-row"><div class="filter-label">酒店类型</div><div class="chips">${renderFilterChips(categories, 'category')}</div></div>
+      <div class="filter-row"><div class="filter-label">地理区域</div><div class="chips">${renderFilterChips(areas, 'area')}</div></div>
+      <div class="filter-row"><div class="filter-label">来源证据</div><div class="chips">${renderFilterChips(evidences, 'evidence')}</div></div>
+      <div class="legend">筛选只使用粗粒度字段。地理区域应是真实位置，不应混入预算、备选、跳价、经典老牌等判断标签；这些判断放在表格里的价格状态或来源证据列。</div>
+    </section>
+
+    <div class="toolbar">
+      <h2>酒店价格矩阵</h2>
+      <div class="note" id="countText">${hotels.length} 家酒店</div>
+    </div>
+    <section class="panel">
+      <table>
+        <thead>
+          <tr>
+            <th class="sticky">酒店</th>
+            <th>类型</th>
+            <th>位置</th>
+            ${nightColumns.map((night) => `<th>${escapeHtml(night)}</th>`).join('')}
+            <th>合计</th>
+            <th>可订均价</th>
+            <th>价格状态</th>
+            <th>来源证据</th>
+            <th>定位</th>
+            <th>优点</th>
+            <th>注意</th>
+            <th>链接</th>
+          </tr>
+        </thead>
+        <tbody id="hotel-body">
+          ${hotels.map((hotel) => renderHotelRow(hotel, nightColumns)).join('')}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="combo-section">
       <div class="toolbar">
         <h2>组合方案</h2>
-        <label>排序
+        <label class="note">排序
           <select id="combo-sort">
             <option value="total">按总价</option>
             <option value="avg">按均价</option>
@@ -451,37 +382,13 @@ function renderHtml(data, title) {
         ${combos.map(renderComboCard).join('')}
       </div>
     </section>
-
-    <section class="panel">
-      <h2>酒店价格矩阵</h2>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th class="sticky">酒店</th>
-              <th>区域</th>
-              <th>位置</th>
-              ${nightColumns.map((night) => `<th>${escapeHtml(night)}</th>`).join('')}
-              <th>后段均价</th>
-              <th>小红书强度</th>
-              <th>优点</th>
-              <th>缺点</th>
-              <th>用途</th>
-              <th>链接</th>
-            </tr>
-          </thead>
-          <tbody id="hotel-body">
-            ${hotels.map((hotel) => renderHotelRow(hotel, nightColumns)).join('')}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  </div>
+  </main>
 
   <script>
-    const active = { region: new Set(), strength: new Set(), 'use-case': new Set() };
+    const active = { category: new Set(), area: new Set(), evidence: new Set() };
     const chips = [...document.querySelectorAll('.chip')];
     const rows = [...document.querySelectorAll('#hotel-body tr')];
+    const countText = document.getElementById('countText');
     const comboGrid = document.getElementById('combo-grid');
     const sortSelect = document.getElementById('combo-sort');
 
@@ -501,21 +408,24 @@ function renderHtml(data, title) {
 
     function matchSet(rowValue, selected) {
       if (!selected.size) return true;
-      const values = String(rowValue || '').split('|').filter(Boolean);
-      return values.some((value) => selected.has(value));
+      return selected.has(String(rowValue || ''));
     }
 
     function filterRows() {
+      let visibleCount = 0;
       for (const row of rows) {
         const visible =
-          matchSet(row.dataset.region, active.region) &&
-          matchSet(row.dataset.strength, active.strength) &&
-          matchSet(row.dataset.useCases, active['use-case']);
-        row.style.display = visible ? '' : 'none';
+          matchSet(row.dataset.category, active.category) &&
+          matchSet(row.dataset.area, active.area) &&
+          matchSet(row.dataset.evidence, active.evidence);
+        row.classList.toggle('hidden', !visible);
+        if (visible) visibleCount += 1;
       }
+      countText.textContent = visibleCount + ' 家酒店';
     }
 
     function sortCombos() {
+      if (!comboGrid || !sortSelect) return;
       const cards = [...comboGrid.querySelectorAll('.combo-card')];
       const key = sortSelect.value;
       cards.sort((a, b) => Number(a.dataset[key]) - Number(b.dataset[key]));
@@ -523,7 +433,7 @@ function renderHtml(data, title) {
     }
 
     chips.forEach((btn) => btn.addEventListener('click', () => toggleChip(btn)));
-    sortSelect.addEventListener('change', sortCombos);
+    if (sortSelect) sortSelect.addEventListener('change', sortCombos);
     sortCombos();
   </script>
 </body>
